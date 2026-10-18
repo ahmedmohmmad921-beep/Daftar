@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>دفتر الديون</title>
+<style>
+:root{
+  --ink:#14213d; --ink2:#1f3057; --gold:#e0a526; --gold-d:#9a6b00;
+  --bg:#f2f4f7; --card:#ffffff; --line:#e1e5ec; --text:#14213d; --muted:#667085;
+  --owe:#c0392b; --ok:#1f8a4c; --owe-bg:#fdecea; --ok-bg:#e7f5ec;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#0d1526; --card:#16213a; --line:#27365a; --text:#eef1f7; --muted:#9aa6c0;
+    --owe:#ff8a7a; --ok:#6fd49a; --owe-bg:#3a1f26; --ok-bg:#16332a; --gold-d:#e0a526}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+  font-family:"Cairo","Tajawal","Segoe UI","Noto Sans Arabic",system-ui,sans-serif;font-size:16px;line-height:1.5}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:96px}
+
+/* header: ledger summary */
+.top{background:var(--ink);color:#fff;padding:20px 18px 26px;border-radius:0 0 28px 28px}
+.top .shop{display:flex;align-items:center;gap:10px;font-weight:700;opacity:.9}
+.top .mark{width:34px;height:34px;border-radius:9px;background:var(--gold);color:var(--ink);
+  display:grid;place-items:center;font-weight:800}
+.top .lbl{margin-top:18px;font-size:14px;opacity:.75}
+.top .big{font-size:42px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.top .big small{font-size:20px;color:var(--gold);margin-inline-start:6px}
+.top .sub{margin-top:6px;font-size:14px;opacity:.8}
+
+.tabs{display:flex;gap:8px;padding:14px 16px 4px}
+.tabs button{flex:1;padding:10px;border-radius:12px;background:transparent;color:var(--muted);font-weight:700}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--text);box-shadow:inset 0 -3px 0 var(--gold)}
+
+.search{margin:8px 16px;position:relative}
+.search input{width:100%;padding:12px 16px;border-radius:14px;border:1.5px solid var(--line);background:var(--card)}
+
+.list{margin:6px 16px;background:var(--card);border-radius:16px;border:1px solid var(--line);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:transparent;text-align:start;
+  border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.av{width:42px;height:42px;border-radius:50%;background:var(--ink2);color:var(--gold);display:grid;place-items:center;font-weight:800;flex:none}
+.row .nm{flex:1;min-width:0}
+.row .nm b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .nm span{font-size:13px;color:var(--muted)}
+.amt{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.amt.owe{color:var(--owe)} .amt.ok{color:var(--ok)} .amt.zero{color:var(--muted)}
+.empty{padding:36px 20px;text-align:center;color:var(--muted)}
+
+.fab{position:fixed;bottom:20px;inset-inline-start:50%;transform:translateX(50%);
+  background:var(--gold);color:var(--ink);font-weight:800;padding:14px 26px;border-radius:999px;
+  box-shadow:0 8px 22px rgba(0,0,0,.28)}
+[dir="rtl"] .fab{transform:translateX(50%)}
+
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,16,30,.55);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.scrim.on{display:flex}
+.sheet{background:var(--card);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:24px 24px 0 0;padding:20px 18px 28px;
+  animation:up .22s ease-out}
+@keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.sheet h2{margin:0 0 4px;font-size:20px}
+.field{display:block;margin:14px 0 0}
+.field span{display:block;font-size:14px;color:var(--muted);margin-bottom:4px}
+.field input{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--bg)}
+.field input.amount{font-size:28px;font-weight:800;text-align:center}
+.btns{display:flex;gap:10px;margin-top:18px}
+.btn{flex:1;padding:13px;border-radius:13px;font-weight:800}
+.btn.gold{background:var(--gold);color:var(--ink)}
+.btn.owe{background:var(--owe-bg);color:var(--owe)}
+.btn.ok{background:var(--ok-bg);color:var(--ok)}
+.btn.wa{background:#25d366;color:#06361a}
+.btn.ghost{background:var(--bg);color:var(--text)}
+.btn.danger{background:transparent;color:var(--owe);font-weight:600;font-size:14px}
+.bal{margin:10px 0 0;padding:16px;border-radius:16px;background:var(--bg);display:flex;justify-content:space-between;align-items:center}
+.bal b{font-size:30px;font-variant-numeric:tabular-nums}
+.tx{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px dashed var(--line)}
+.tx small{color:var(--muted);display:block}
+.tx:last-child{border-bottom:0}
+.hd{margin:20px 0 4px;font-size:15px;color:var(--muted);font-weight:700}
+
+/* today */
+.cards{margin:10px 16px;display:grid;gap:10px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;justify-content:space-between;align-items:center}
+.stat b{font-size:24px;font-variant-numeric:tabular-nums}
+.stat.hl{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stat.hl b{color:var(--gold)}
+.note{margin:6px 18px;font-size:13px;color:var(--muted)}
+/* auth */
+.auth{min-height:100vh;display:flex;flex-direction:column;max-width:520px;margin:0 auto}
+.auth .hero{background:var(--ink);color:#fff;padding:44px 24px 70px;border-radius:0 0 36px 36px;text-align:center}
+.auth .logo{width:68px;height:68px;margin:0 auto 14px;border-radius:20px;background:var(--gold);color:var(--ink);
+  display:grid;place-items:center;font-size:36px;font-weight:800;box-shadow:0 10px 26px rgba(224,165,38,.35)}
+.auth h1{margin:0;font-size:28px}
+.auth .tag{margin:6px 0 0;opacity:.8;font-size:15px}
+.auth .box{background:var(--card);margin:-40px 16px 24px;border-radius:22px;padding:18px 18px 22px;border:1px solid var(--line);
+  box-shadow:0 14px 34px rgba(10,16,30,.14)}
+.seg{display:flex;background:var(--bg);border-radius:14px;padding:4px;gap:4px}
+.seg button{flex:1;padding:10px;border-radius:11px;background:transparent;color:var(--muted);font-weight:700}
+.seg button[aria-selected="true"]{background:var(--card);color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.pw{position:relative}
+.pw input{padding-inline-end:64px}
+.pw button{position:absolute;inset-block:0;inset-inline-end:6px;background:transparent;color:var(--gold-d);font-weight:700;font-size:14px;padding:0 10px}
+.err{margin-top:12px;padding:10px 12px;border-radius:12px;background:var(--owe-bg);color:var(--owe);font-size:14px;display:none}
+.err.on{display:block}
+.perks{margin:16px 4px 0;padding:0;list-style:none;display:grid;gap:6px;font-size:14px;color:var(--muted)}
+.perks li::before{content:"✓";color:var(--ok);font-weight:800;margin-inline-end:8px}
+.fine{margin:14px 6px 0;font-size:12px;color:var(--muted);text-align:center}
+.out{margin-inline-start:auto;background:rgba(255,255,255,.12);color:#fff;padding:6px 12px;border-radius:10px;font-size:13px;font-weight:700}
+.trial{display:inline-block;margin-top:10px;background:rgba(224,165,38,.2);color:var(--gold);padding:3px 12px;border-radius:999px;font-size:13px;font-weight:700}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.chip{padding:9px 14px;border-radius:999px;background:var(--bg);border:1.5px solid var(--line);color:var(--text);font-weight:700;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink);box-shadow:inset 0 -3px 0 var(--gold)}
+.filters{display:flex;gap:8px;margin:2px 16px 6px}
+.panel{margin:10px 16px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+.panel h3{margin:0 0 8px;font-size:16px}
+.mini{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line)}
+.mini:last-child{border-bottom:0}
+.xdel{background:transparent;color:var(--muted);font-size:12px;padding:2px 8px;border-radius:8px;margin-inline-start:6px}
+.xdel.sure{background:var(--owe-bg);color:var(--owe);font-weight:700}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;margin:14px 0 0}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gbtn{width:100%;margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;background:var(--card)!important;border:1.5px solid var(--line)!important}
+.err.good{background:var(--ok-bg);color:var(--ok)}
+.code{font-size:30px!important;font-weight:800;text-align:center;letter-spacing:10px}
+.link{background:transparent;color:var(--gold-d);font-weight:700;padding:8px;font-size:14px}
+.syb{margin-top:4px;font-size:13px;opacity:.85;min-height:20px}
+.steps{margin:0;padding-inline-start:20px;font-size:14px;color:var(--muted)}
+.toast{position:fixed;top:14px;inset-inline:0;margin:auto;width:max-content;max-width:90%;background:var(--ink);color:#fff;
+  padding:10px 18px;border-radius:12px;z-index:50;display:none;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="scrim" id="scrim"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ===== إعدادات Firebase: الصق هنا القيم من موقع Firebase (Project settings ← Your apps) ===== */
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDhMHROTtYpGE5XNh_dHopLs7-tAcnp9l0",
+  authDomain: "daftar-al-zaka.firebaseapp.com",
+  projectId: "daftar-al-zaka",
+  appId: "1:258899297507:web:68e5dc210ce68f045f31d6"
+};
+</script>
+<script>
+const CUR = "₪";
+let S = { shop: "محلي", type: "other", customers: [] };
+let tab = "customers", q = "";
+const $ = s => document.querySelector(s);
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = n => Number(n).toLocaleString("ar-EG-u-nu-latn", {maximumFractionDigits:2});
+const uid = () => Math.random().toString(36).slice(2, 9);
+const today = () => new Date().toISOString().slice(0,10);
+const fmtDate = iso => new Date(iso).toLocaleDateString("ar", {day:"numeric", month:"short"});
+const bal = c => c.tx.reduce((s,t) => s + (t.type === "debt" ? t.amt : -t.amt), 0);
+
+/* storage: window.storage inside Claude, localStorage when the file is opened on its own */
+let user = null;
+const mem = {};
+async function kget(k){
+  try{
+    if(window.storage){ const r = await window.storage.get(k); if(r && r.value) return JSON.parse(r.value); }
+    else { const v = localStorage.getItem(k); if(v) return JSON.parse(v); }
+  }catch(e){}
+  return mem[k] ? JSON.parse(mem[k]) : null;
+}
+async function kset(k,v){
+  const s = JSON.stringify(v); mem[k] = s;
+  try{ if(window.storage) await window.storage.set(k, s); else localStorage.setItem(k, s); }catch(e){}
+}
+async function kdel(k){
+  delete mem[k];
+  try{ if(window.storage) await window.storage.delete(k); else localStorage.removeItem(k); }catch(e){}
+}
+async function save(){ if(user){ await kset("data-"+user.id, S); schedulePush(); } }
+
+/* ---------- Firebase: accounts + cloud data ---------- */
+const ONLINE = !!(window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey);
+let FB = null;                                   // يتعبّى من سكربت الـ module أسفل الصفحة
+const fbReady = new Promise(r => { window.__fbReady = r; });
+let session = null;                              // { uid, email, base, dirty, pending }
+let unsub = null, pushTimer = null, syncState = "ok", ver = 0, wasIn = false, verifyTimer = null;
+const EMPTY = () => ({ shop:"محلي", type:"other", customers:[] });
+const normalize = d => ({ shop: d.shop || "محلي", type: d.type || "other",
+  customers: (d.customers||[]).map(c=>({id:c.id,name:c.name,phone:c.phone||"",email:c.email||"",tx:c.tx||[]})) });
+const persistSess = () => session ? kset("fbs-"+session.uid, { base:session.base, dirty:session.dirty }) : null;
+const docRef = () => FB.doc(FB.db, "users", session.uid);
+function syncLabel(){
+  if(!session) return "";
+  return {ok:"☁️ محفوظ بحسابك", busy:"⏳ جاري الحفظ…", err:"⚠️ لا يوجد اتصال. بياناتك محفوظة وبتنرفع لما يرجع النت"}[syncState];
+}
+function setSyncState(st){ syncState = st; const el=$("#sy"); if(el) el.textContent = syncLabel(); }
+
+function schedulePush(){
+  if(!session || !FB) return;
+  session.dirty = true; ver++; persistSess(); setSyncState("busy");
+  clearTimeout(pushTimer); pushTimer = setTimeout(push, 900);
+}
+async function push(){
+  if(!session || !FB) return;
+  if(!navigator.onLine){ setSyncState("err"); return; }
+  const sess = session, myVer = ver, ts = Date.now();
+  sess.pending = ts; setSyncState("busy");
+  try{
+    await FB.setDoc(docRef(), { data: JSON.stringify(S), updated: ts, shop: S.shop });
+    if(session !== sess) return;
+    sess.base = ts; if(ver === myVer) sess.dirty = false;
+    persistSess(); setSyncState(sess.dirty ? "busy" : "ok");
+  }catch(e){ setSyncState("err"); }
+}
+window.addEventListener("online", ()=>{ if(session && session.dirty) push(); });
+
+function adoptRemote(d){
+  try{ S = normalize(JSON.parse(d.data)); }catch(e){ return; }
+  session.base = d.updated; session.dirty = false;
+  kset("data-"+session.uid, S); persistSess(); setSyncState("ok"); render();
+}
+async function attach(){
+  const sess = session;
+  try{
+    const snap = await FB.getDoc(docRef());
+    if(session !== sess) return;
+    if(!snap.exists()){
+      const p = await kget("pending-"+sess.email);
+      if(p && S.customers.length === 0){ S.shop = p.shop; S.type = p.type; }
+      await kdel("pending-"+sess.email);
+      session.dirty = true; render(); await push();
+    } else {
+      const d = snap.data();
+      if(d.updated !== session.base){ const first = !session.base; adoptRemote(d); if(!first) toast("تم تحديث بياناتك"); }
+      else if(session.dirty) await push(); else setSyncState("ok");
+    }
+    if(session !== sess) return;
+    unsub = FB.onSnapshot(docRef(), s2 => {
+      if(session !== sess || s2.metadata.hasPendingWrites) return;
+      const d = s2.data(); if(!d) return;
+      if(d.updated === session.base || d.updated === session.pending || session.dirty) return;
+      adoptRemote(d); toast("تم تحديث بياناتك من جهاز آخر");
+    }, ()=>setSyncState("err"));
+  }catch(e){ setSyncState("err"); }
+}
+function cleanup(){
+  if(unsub){ unsub(); unsub = null; }
+  clearTimeout(pushTimer); session = null; user = null; S = EMPTY();
+}
+
+async function startSession(u){
+  if(session && session.uid === u.uid) return;
+  const saved = (await kget("fbs-"+u.uid)) || {};
+  user = { id: u.uid, name: u.displayName || u.email.split("@")[0] };
+  session = { uid:u.uid, email:u.email, base:saved.base||0, dirty:!!saved.dirty, pending:0 };
+  S = (await kget("data-"+u.uid)) || EMPTY();
+  tab = "customers"; q = ""; filt = "all";
+  render(); setSyncState("busy"); toast("أهلًا " + user.name);
+  attach();
+}
+async function handleAuth(u){
+  clearInterval(verifyTimer);
+  if(!u){ cleanup(); renderAuth(wasIn ? "login" : "signup"); wasIn = false; return; }
+  wasIn = true;
+  if(!u.emailVerified){ renderAuth("verify","",{email:u.email}); return; }
+  await startSession(u);
+}
+async function checkVerified(silent){
+  const u = FB.auth.currentUser; if(!u) return;
+  try{ await u.reload(); }catch(e){ if(!silent) authErr(fbMsg(e)); return; }
+  if(u.emailVerified){ clearInterval(verifyTimer); await u.getIdToken(true); await startSession(u); }
+  else if(!silent) authErr("لسا ما تفعّل الحساب. اضغط الرابط اللي وصلك بالإيميل وارجع هون");
+}
+async function logout(){
+  if(session){ await kdel("data-"+session.uid); await kdel("fbs-"+session.uid); }
+  if(FB) await FB.signOut(FB.auth); else { cleanup(); renderAuth("login"); }
+}
+async function bootOnline(){
+  const fb = await Promise.race([fbReady, new Promise(r=>setTimeout(()=>r(null), 12000))]);
+  if(!fb){ renderAuth("login","تعذّر الاتصال بخدمة Firebase. تأكد من الإنترنت وأعد تحميل الصفحة."); return; }
+  FB = fb;
+  FB.onAuthStateChanged(FB.auth, handleAuth);
+}
+
+/* ---------- auth screens ---------- */
+const normPhone = p => p.replace(/[٠-٩]/g, d=>"٠١٢٣٤٥٦٧٨٩".indexOf(d)).replace(/[^\d]/g,"");
+const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+let signupType = "grocery";
+const FBERR = {
+  "auth/email-already-in-use":"هذا الإيميل مسجّل من قبل. جرّب تسجيل الدخول",
+  "auth/invalid-credential":"الإيميل أو كلمة السر غلط", "auth/wrong-password":"الإيميل أو كلمة السر غلط",
+  "auth/user-not-found":"الإيميل أو كلمة السر غلط", "auth/invalid-email":"اكتب إيميل صحيح",
+  "auth/weak-password":"كلمة السر ضعيفة. استخدم ٦ أحرف على الأقل",
+  "auth/too-many-requests":"محاولات كثيرة. جرّب بعد شوي",
+  "auth/network-request-failed":"تعذّر الاتصال. تأكد من الإنترنت",
+  "auth/popup-closed-by-user":"", "auth/cancelled-popup-request":"",
+  "auth/popup-blocked":"المتصفح منع النافذة. اسمح بالنوافذ المنبثقة وجرّب ثانية",
+  "auth/unauthorized-domain":"هذا الموقع مش مضاف لقائمة النطاقات المسموحة في Firebase",
+  "auth/operation-not-allowed":"طريقة الدخول هاي مش مفعّلة في Firebase"
+};
+const fbMsg = e => (e && e.code in FBERR) ? FBERR[e.code] : "صار خطأ: " + ((e && e.code) || "غير معروف");
+const authHero = `<div class="hero"><div class="logo">د</div><h1>الدفتر الذكي</h1><p class="tag">دفترك صار بجيبتك. سجّل الديون وخلّي حسابك مرتّب</p></div>`;
+
+function renderSetup(){
+  $("#app").innerHTML = `<div class="auth">${authHero}<div class="box">
+    <h2 style="margin:0 0 6px;font-size:18px">لازم تربط التطبيق بـ Firebase</h2>
+    <p style="color:var(--muted);font-size:14px">افتح الملف بمحرر نصوص وضع إعدادات Firebase بالكتلة <b dir="ltr">FIREBASE_CONFIG</b> بأول الملف.</p>
+    <div class="btns"><button class="btn ghost" id="demo">جرّب بدون حساب (على هذا الجهاز)</button></div></div></div>`;
+  $("#demo").onclick = async()=>{ user={id:"demo",name:"تجريبي"}; S=(await kget("data-demo"))||EMPTY(); tab="customers"; render(); };
+}
+
+function renderAuth(mode="login", msg="", ctx={}){
+  clearInterval(verifyTimer);
+  if(!ONLINE) return renderSetup();
+  const pwField = (id,label,auto)=>`<label class="field"><span>${label}</span><div class="pw"><input id="${id}" type="password" dir="ltr" style="text-align:right" autocomplete="${auto}">${id==="pw"?'<button type="button" id="eye">إظهار</button>':""}</div></label>`;
+  const emailField = v=>`<label class="field"><span>الإيميل</span><input id="em" type="email" inputmode="email" dir="ltr" style="text-align:right" autocomplete="username" value="${esc(v||"")}"></label>`;
+  const errBox = `<div class="err ${msg?"on":""} ${ctx.good?"good":""}" id="er" role="alert">${esc(msg)}</div>`;
+  const gbtn = t=>`<button type="button" class="btn gbtn" id="gg"><b style="color:#4285F4;font-size:18px" aria-hidden="true">G</b>${t}</button><div class="or">أو بالإيميل</div>`;
+  let inner = "";
+  if(mode==="login"||mode==="signup"){
+    const su = mode==="signup";
+    inner = `<div class="seg" role="tablist">
+        <button type="button" role="tab" data-m="login" aria-selected="${!su}">تسجيل دخول</button>
+        <button type="button" role="tab" data-m="signup" aria-selected="${su}">حساب جديد</button></div>
+      ${gbtn(su?"التسجيل بحساب Google":"الدخول بحساب Google")}
+      ${su?`<label class="field"><span>اسمك</span><input id="nm" autocomplete="name"></label>
+      <div class="field"><span>شو نوع محلك؟</span>${chipsHTML(signupType)}</div>
+      <label class="field"><span>اسم المحل (اختياري)</span><input id="sh" placeholder="مثال: أبو أحمد. وإذا تركته فاضي نستخدم نوع المحل"></label>`:""}
+      ${emailField(ctx.email)}
+      ${pwField("pw","كلمة السر"+(su?" (٦ أحرف على الأقل)":""), su?"new-password":"current-password")}
+      ${su?pwField("pw2","أعد كتابة كلمة السر","new-password"):""}
+      ${errBox}
+      <div class="btns"><button class="btn gold" type="submit" id="go">${su?"أنشئ حسابي":"دخول"}</button></div>
+      ${su?`<p class="fine">رح نرسل رابط تفعيل لإيميلك. بياناتك بتنحفظ بحسابك وبتفتحها من أي موبايل.</p>`
+          :`<div style="text-align:center"><button type="button" class="link" id="forgot">نسيت كلمة السر؟</button></div>`}`;
+  } else if(mode==="verify"){
+    inner = `<h2 style="margin:0 0 4px;font-size:19px">فعّل حسابك</h2>
+      <p style="color:var(--muted);font-size:14px;margin:0">أرسلنا رابط تفعيل إلى <b dir="ltr">${esc(ctx.email)}</b>. افتح الرسالة واضغط الرابط، وبعدها بيكمل التطبيق لحاله. إذا ما وصلت شوف مجلد Spam.</p>
+      ${errBox}
+      <div class="btns"><button class="btn gold" type="submit" id="go">تحققت، تابع</button></div>
+      <div style="display:flex;justify-content:space-between"><button type="button" class="link" id="resend">إعادة إرسال الرابط</button><button type="button" class="link" id="back">تسجيل خروج</button></div>`;
+  } else if(mode==="forgot"){
+    inner = `<h2 style="margin:0 0 4px;font-size:19px">استعادة كلمة السر</h2>
+      <p style="color:var(--muted);font-size:14px;margin:0">اكتب إيميلك وبنرسل لك رابطًا لتعيين كلمة سر جديدة.</p>
+      ${emailField(ctx.email)}${errBox}
+      <div class="btns"><button class="btn gold" type="submit" id="go">أرسل الرابط</button></div>
+      <div style="text-align:center"><button type="button" class="link" id="back">رجوع</button></div>`;
+  }
+  $("#app").innerHTML = `<div class="auth">${authHero}<form class="box" id="af" novalidate>${inner}</form></div>`;
+  document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>renderAuth(b.dataset.m));
+  if(mode==="signup") wireChips(k=>signupType=k);
+  const eye=$("#eye"); if(eye) eye.onclick=()=>{ const i=$("#pw"), show=i.type==="password"; i.type=show?"text":"password"; eye.textContent=show?"إخفاء":"إظهار"; };
+  const fg=$("#forgot"); if(fg) fg.onclick=()=>renderAuth("forgot","",{email:($("#em").value||"").trim()});
+  const gg=$("#gg"); if(gg) gg.onclick=googleLogin;
+  const bk=$("#back"); if(bk) bk.onclick=()=> mode==="verify" ? logout() : renderAuth("login");
+  const rs=$("#resend"); if(rs) rs.onclick=async()=>{
+    try{ await FB.sendEmailVerification(FB.auth.currentUser); toast("أرسلنا الرابط من جديد"); }catch(e){ authErr(fbMsg(e)); }
+  };
+  $("#af").onsubmit = e=>{ e.preventDefault(); submitAuth(mode, ctx); };
+  if(mode==="verify") verifyTimer = setInterval(()=>checkVerified(true), 4000);
+}
+function authErr(m){ const e=$("#er"); const g=$("#go"); if(g) g.disabled=false; if(!e) return; e.textContent=m||""; e.className = m ? "err on" : "err"; }
+
+async function googleLogin(){
+  try{ await FB.signInWithPopup(FB.auth, new FB.GoogleAuthProvider()); }
+  catch(e){ authErr(fbMsg(e)); }
+}
+
+async function submitAuth(mode, ctx){
+  const v = id => ($("#"+id) ? $("#"+id).value.trim() : "");
+  $("#er").className = "err";
+  try{
+    if(mode==="signup"){
+      const name=v("nm"), email=v("em").toLowerCase(), pw=$("#pw").value;
+      if(!name) return authErr("اكتب اسمك");
+      if(!validEmail(email)) return authErr("اكتب إيميل صحيح");
+      if(pw.length<6) return authErr("كلمة السر لازم تكون ٦ أحرف على الأقل");
+      if(pw!==$("#pw2").value) return authErr("كلمتا السر مش متطابقتين");
+      $("#go").disabled=true;
+      await kset("pending-"+email, { shop: v("sh")||typeOf(signupType).n, type: signupType });
+      const cred = await FB.createUserWithEmailAndPassword(FB.auth, email, pw);
+      await FB.updateProfile(cred.user, { displayName: name });
+      await FB.sendEmailVerification(cred.user);
+      toast("أرسلنا رابط التفعيل لإيميلك");
+    }
+    else if(mode==="login"){
+      const email=v("em").toLowerCase(), pw=$("#pw").value;
+      if(!validEmail(email)||!pw) return authErr("اكتب الإيميل وكلمة السر");
+      $("#go").disabled=true;
+      await FB.signInWithEmailAndPassword(FB.auth, email, pw);
+    }
+    else if(mode==="verify"){ await checkVerified(false); }
+    else if(mode==="forgot"){
+      const email=v("em").toLowerCase(); if(!validEmail(email)) return authErr("اكتب إيميل صحيح");
+      $("#go").disabled=true;
+      try{ await FB.sendPasswordResetEmail(FB.auth, email); }
+      catch(e){ if(e.code!=="auth/user-not-found") throw e; }
+      renderAuth("login","إذا كان الإيميل مسجّلًا بنرسل لك رابطًا لتغيير كلمة السر. شوف بريدك.",{email,good:true});
+    }
+  }catch(e){ authErr(fbMsg(e)); }
+}
+
+function toast(m){ const t=$("#toast"); t.textContent=m; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none",1800); }
+
+function render(){
+  const owed = S.customers.reduce((s,c)=>s+Math.max(0,bal(c)),0);
+  const debtors = S.customers.filter(c=>bal(c)>0).length;
+  let body = "";
+  if(tab === "customers"){
+    const list = S.customers.filter(c => c.name.includes(q.trim()) && (filt==="all" || bal(c)>0))
+      .sort((a,b)=>bal(b)-bal(a));
+    body = `<div class="search"><input id="q" type="search" placeholder="ابحث باسم الزبون" value="${esc(q)}" aria-label="بحث"></div>
+      <div class="filters"><button class="chip" data-f="all" aria-pressed="${filt==="all"}">الكل</button><button class="chip" data-f="debt" aria-pressed="${filt==="debt"}">عليهم دين فقط</button></div>
+      <div class="list">${list.length ? list.map(c=>{
+        const b = bal(c), cls = b>0?"owe":b<0?"ok":"zero";
+        const last = c.tx.length ? "آخر حركة " + fmtDate(c.tx[c.tx.length-1].date) : "بدون حركات";
+        return `<button class="row" data-id="${c.id}"><div class="av">${esc(c.name[0]||"؟")}</div>
+          <div class="nm"><b>${esc(c.name)}</b><span>${last}</span></div>
+          <div class="amt ${cls}">${num(Math.abs(b))} ${CUR}</div></button>`;}).join("")
+        : `<div class="empty">${S.customers.length ? "ما في زبون بهذا الاسم" : "لسا ما أضفت أي زبون.<br>اضغط «زبون جديد» وابدأ بتسجيل أول دين."}</div>`}</div>
+      <button class="fab" id="addC">+ زبون جديد</button>`;
+  } else {
+    const t = today();
+    let debts=0, pays=0;
+    S.customers.forEach(c=>c.tx.forEach(x=>{ if(x.date.slice(0,10)===t){ x.type==="debt"? debts+=x.amt : pays+=x.amt; }}));
+    body = `<div class="cards">
+      <div class="stat"><span>دين جديد اليوم</span><b style="color:var(--owe)">${num(debts)} ${CUR}</b></div>
+      <div class="stat"><span>مبالغ استلمتها اليوم</span><b style="color:var(--ok)">${num(pays)} ${CUR}</b></div>
+      <div class="stat hl"><span>صافي الحركة اليوم</span><b>${num(pays-debts)} ${CUR}</b></div>
+      <div class="stat"><span>إجمالي ديونك عند الناس</span><b>${num(owed)} ${CUR}</b></div>
+    </div>
+    <div class="panel"><h3>أكبر الديون عندك</h3>${
+      S.customers.filter(c=>bal(c)>0).sort((a,b)=>bal(b)-bal(a)).slice(0,5).map(c=>
+        `<div class="mini"><span>${esc(c.name)}</span><b class="amt owe">${num(bal(c))} ${CUR}</b></div>`).join("")
+      || `<div class="empty" style="padding:10px">ما في ديون حاليًا 👌</div>`}</div>
+    <div class="panel"><h3>إعدادات المحل</h3>
+      <label class="field" style="margin-top:0"><span>اسم المحل (يظهر في كشف الحساب)</span><input id="shop" value="${esc(S.shop)}"></label>
+      <div class="field"><span>نوع المحل</span>${chipsHTML(S.type)}</div></div>
+    <div class="panel"><h3>حسابي</h3>${ session ? `
+      <p class="note" style="margin:0 0 10px"><b dir="ltr">${esc(session.email)}</b><br>بياناتك محفوظة بحسابك. سجّل دخولك بنفس الحساب من أي موبايل وبتلاقيها.</p>
+      <div class="btns" style="margin-top:0"><button class="btn gold" id="snow">زامن الآن</button></div>` : `
+      <p class="note" style="margin:0">أنت بالوضع التجريبي: البيانات على هذا الجهاز فقط.</p>`}</div>
+    <div class="panel"><h3>نسخة احتياطية</h3>
+      <p class="note" style="margin:0 0 10px">بياناتك محفوظة على هذا الجهاز فقط. نزّل نسخة من وقت لوقت، وارجع استوردها لو غيّرت الجهاز.</p>
+      <div class="btns" style="margin-top:0"><button class="btn gold" id="exp">تنزيل نسخة</button>
+      <button class="btn ghost" id="imp">استيراد نسخة</button></div>
+      <input type="file" id="file" accept="application/json" hidden></div>`;
+  }
+  $("#app").innerHTML = `
+    <header class="top"><div class="shop"><div class="mark">${typeOf(S.type).i}</div>${esc(S.shop)}<button class="out" id="out">خروج</button></div>
+      <div class="lbl">الناس عليهم لك</div>
+      <div class="big">${num(owed)}<small>${CUR}</small></div>
+      <div class="sub">${debtors ? debtors + " زبون عليهم دين" : "ما في ديون حاليًا"}</div><div class="syb" id="sy">${syncLabel()}</div></header>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="customers" aria-selected="${tab==="customers"}">الزبائن</button>
+      <button role="tab" data-tab="today" aria-selected="${tab==="today"}">نهاية اليوم</button></nav>${body}`;
+  bind();
+}
+
+const TYPES = [
+  {k:"grocery", n:"بقالة", i:"🛒"}, {k:"kiosk", n:"كشك", i:"🏪"}, {k:"stall", n:"بسطة", i:"🧺"},
+  {k:"cafe", n:"قهوة / كافيه", i:"☕"}, {k:"pharmacy", n:"صيدلية", i:"💊"}, {k:"other", n:"غير ذلك", i:"📒"}
+];
+const typeOf = k => TYPES.find(t=>t.k===k) || TYPES[5];
+const chipsHTML = sel => `<div class="chips" id="types">${TYPES.map(t=>
+  `<button type="button" class="chip" data-k="${t.k}" aria-pressed="${t.k===sel}">${t.i} ${t.n}</button>`).join("")}</div>`;
+function wireChips(onPick){
+  document.querySelectorAll("#types .chip").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#types .chip").forEach(x=>x.setAttribute("aria-pressed", x===b));
+    onPick(b.dataset.k);
+  });
+}
+let filt = "all";
+function bind(){
+  const o=$("#out"); if(o) o.onclick=logout;
+  document.querySelectorAll("[data-tab]").forEach(b=>b.onclick=()=>{tab=b.dataset.tab;render();});
+  document.querySelectorAll(".row").forEach(b=>b.onclick=()=>openCustomer(b.dataset.id));
+  const qi=$("#q"); if(qi){ qi.oninput=e=>{q=e.target.value; const p=e.target.selectionStart; render(); const n=$("#q"); n.focus(); n.setSelectionRange(p,p);} }
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{filt=b.dataset.f;render();});
+  const a=$("#addC"); if(a) a.onclick=openNewCustomer;
+  const sn=$("#snow"); if(sn) sn.onclick=()=>push();
+  const sh=$("#shop"); if(sh){
+    sh.onchange=e=>{S.shop=e.target.value.trim()||typeOf(S.type).n; save(); render(); toast("تم الحفظ");};
+    wireChips(k=>{S.type=k; if(!S.shop || TYPES.some(t=>t.n===S.shop)) S.shop=typeOf(k).n; save(); render(); toast("تم الحفظ");});
+    $("#exp").onclick=exportData;
+    $("#imp").onclick=()=>$("#file").click();
+    $("#file").onchange=importData;
+  }
+}
+
+function openSheet(html){ $("#sheet").innerHTML = html; $("#scrim").classList.add("on"); }
+function closeSheet(){ $("#scrim").classList.remove("on"); }
+$("#scrim").addEventListener("click", e=>{ if(e.target.id==="scrim") closeSheet(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeSheet(); });
+
+function openNewCustomer(){
+  openSheet(`<h2>زبون جديد</h2>
+    <label class="field"><span>الاسم</span><input id="n" autocomplete="off"></label>
+    <label class="field"><span>رقم الجوال (اختياري)</span><input id="p" type="tel" inputmode="tel" placeholder="0599123456"></label>
+    <label class="field"><span>الإيميل (اختياري)</span><input id="em" type="email" dir="ltr" style="text-align:right"></label>
+    <div class="btns"><button class="btn ghost" id="x">إلغاء</button><button class="btn gold" id="ok">حفظ الزبون</button></div>`);
+  $("#n").focus(); $("#x").onclick=closeSheet;
+  $("#ok").onclick=()=>{
+    const name=$("#n").value.trim(); if(!name){ toast("اكتب اسم الزبون"); return; }
+    const c={id:uid(),name,phone:$("#p").value.trim(),email:$("#em").value.trim(),tx:[]};
+    S.customers.push(c); save(); closeSheet(); render(); openCustomer(c.id);
+  };
+}
+
+function openCustomer(id){
+  const c=S.customers.find(x=>x.id===id); if(!c) return;
+  const b=bal(c), cls=b>0?"owe":b<0?"ok":"zero";
+  const label = b>0?"عليه لك":b<0?"له عندك":"مسدَّد";
+  const txs=[...c.tx].reverse();
+  openSheet(`<h2>${esc(c.name)}</h2>
+    <div style="color:var(--muted);font-size:14px">${esc(c.phone)||"بدون رقم جوال"}${c.email?" · "+esc(c.email):""}</div>
+    <div class="bal"><span>${label}</span><b class="amt ${cls}">${num(Math.abs(b))} ${CUR}</b></div>
+    <div class="btns"><button class="btn owe" id="d">+ سجّل دين</button><button class="btn ok" id="p">− سجّل دفعة</button></div>
+    <div class="btns" style="margin-top:10px"><button class="btn wa" id="wa">واتساب</button><button class="btn ghost" id="sms">رسالة SMS</button></div>
+    <div class="btns" style="margin-top:10px"><button class="btn ghost" id="mail">إيميل</button><button class="btn ghost" id="edit">تعديل البيانات</button></div>
+    <div class="hd">الحركات</div>
+    ${txs.length? txs.map(t=>`<div class="tx"><div><b>${t.type==="debt"?"دين":"دفعة"}</b><small>${fmtDate(t.date)}${t.note?" · "+esc(t.note):""}</small></div>
+      <div style="display:flex;align-items:center"><div class="amt ${t.type==="debt"?"owe":"ok"}">${t.type==="debt"?"+":"−"}${num(t.amt)} ${CUR}</div><button class="xdel" data-t="${t.id}" aria-label="حذف الحركة">حذف</button></div></div>`).join("")
+      : `<div class="empty" style="padding:18px">ما في حركات بعد</div>`}
+    <div class="btns"><button class="btn ghost" id="cl">إغلاق</button><button class="btn danger" id="del">حذف الزبون</button></div>`);
+  $("#cl").onclick=closeSheet;
+  $("#d").onclick=()=>openTx(id,"debt");
+  $("#p").onclick=()=>openTx(id,"pay");
+  $("#wa").onclick=()=>sendWA(c);
+  $("#sms").onclick=()=>sendSMS(c);
+  $("#mail").onclick=()=>sendMail(c);
+  $("#edit").onclick=()=>openEdit(c);
+  document.querySelectorAll(".xdel").forEach(b=>b.onclick=()=>{
+    if(!b.classList.contains("sure")){ b.classList.add("sure"); b.textContent="تأكيد؟"; return; }
+    c.tx=c.tx.filter(t=>t.id!==b.dataset.t); save(); render(); openCustomer(id); toast("انحذفت الحركة");
+  });
+  $("#del").onclick=()=>{
+    $("#del").textContent="اضغط مرة ثانية للتأكيد";
+    $("#del").onclick=()=>{ S.customers=S.customers.filter(x=>x.id!==id); save(); closeSheet(); render(); toast("انحذف الزبون"); };
+  };
+}
+
+function openTx(id,type){
+  const c=S.customers.find(x=>x.id===id);
+  const isD=type==="debt";
+  openSheet(`<h2>${isD?"تسجيل دين على":"تسجيل دفعة من"} ${esc(c.name)}</h2>
+    <label class="field"><span>المبلغ (${CUR})</span><input class="amount" id="a" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></label>
+    <label class="field"><span>ملاحظة (اختياري)</span><input id="nt" placeholder="${isD?"مثال: بسكويت وعصير":"مثال: دفع كاش"}"></label>
+    <div class="btns"><button class="btn ghost" id="x">رجوع</button><button class="btn ${isD?"owe":"ok"}" id="ok">${isD?"سجّل الدين":"سجّل الدفعة"}</button></div>`);
+  $("#a").focus(); $("#x").onclick=()=>openCustomer(id);
+  const go=()=>{
+    const amt=parseFloat($("#a").value);
+    if(!(amt>0)){ toast("اكتب مبلغًا أكبر من صفر"); return; }
+    c.tx.push({id:uid(),type,amt,note:$("#nt").value.trim(),date:new Date().toISOString()});
+    save(); render(); openCustomer(id); toast(isD?"تم تسجيل الدين":"تم تسجيل الدفعة");
+  };
+  $("#ok").onclick=go; $("#a").onkeydown=e=>{ if(e.key==="Enter") go(); };
+}
+
+function exportData(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="daftar-backup-"+today()+".json"; document.body.appendChild(a); a.click(); a.remove();
+  toast("تم تنزيل النسخة");
+}
+function importData(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const d=JSON.parse(r.result);
+      if(!d || !Array.isArray(d.customers)) throw 0;
+      S={shop:d.shop||S.shop, type:d.type||S.type, customers:d.customers}; save(); render(); toast("تم استيراد النسخة");
+    }catch(x){ toast("الملف غير صالح"); }
+  };
+  r.readAsText(f);
+}
+
+function buildMsg(c){
+  const b=bal(c);
+  const lines=c.tx.slice(-8).map(t=>`${fmtDate(t.date)}  ${t.type==="debt"?"دين":"دفعة"}  ${t.type==="debt"?"+":"-"}${num(t.amt)}${t.note?" ("+t.note+")":""}`);
+  return `السلام عليكم ${c.name}،\nكشف حسابك لدى ${S.shop}:\n\n${lines.join("\n")}\n\n${b>0?"المتبقي عليك":"الرصيد"}: ${num(Math.abs(b))} ${CUR}\nشكرًا لتعاملك معنا 🌿`;
+}
+function intl(phone){
+  let ph=normPhone(phone||"");
+  if(ph.startsWith("00")) ph=ph.slice(2); else if(ph.startsWith("0")) ph="970"+ph.slice(1);
+  return ph;
+}
+function sendWA(c){ const ph=intl(c.phone); window.open((ph?`https://wa.me/${ph}`:`https://wa.me/`)+`?text=${encodeURIComponent(buildMsg(c))}`,"_blank"); }
+function sendSMS(c){
+  if(!c.phone) return toast("أضف رقم الجوال من «تعديل البيانات»");
+  window.location.href = `sms:${normPhone(c.phone)}?&body=${encodeURIComponent(buildMsg(c))}`;
+}
+function sendMail(c){
+  if(!c.email) return toast("أضف الإيميل من «تعديل البيانات»");
+  window.location.href=`mailto:${c.email}?subject=${encodeURIComponent("كشف حسابك لدى "+S.shop)}&body=${encodeURIComponent(buildMsg(c))}`;
+}
+function openEdit(c){
+  openSheet(`<h2>تعديل بيانات الزبون</h2>
+    <label class="field"><span>الاسم</span><input id="en" value="${esc(c.name)}"></label>
+    <label class="field"><span>رقم الجوال</span><input id="ep" type="tel" inputmode="tel" value="${esc(c.phone)}"></label>
+    <label class="field"><span>الإيميل</span><input id="ee" type="email" dir="ltr" style="text-align:right" value="${esc(c.email||"")}"></label>
+    <div class="btns"><button class="btn ghost" id="x">رجوع</button><button class="btn gold" id="ok">حفظ</button></div>`);
+  $("#x").onclick=()=>openCustomer(c.id);
+  $("#ok").onclick=()=>{
+    const n=$("#en").value.trim(); if(!n) return toast("اكتب اسم الزبون");
+    c.name=n; c.phone=$("#ep").value.trim(); c.email=$("#ee").value.trim();
+    save(); render(); openCustomer(c.id); toast("تم الحفظ");
+  };
+}
+
+if(ONLINE) bootOnline(); else renderAuth("login");
+</script>
+<script type="module">
+  const cfg = window.FIREBASE_CONFIG;
+  if(cfg && cfg.apiKey){
+    try{
+      const V = "10.14.1", B = `https://www.gstatic.com/firebasejs/${V}/`;
+      const { initializeApp } = await import(B+"firebase-app.js");
+      const A = await import(B+"firebase-auth.js");
+      const F = await import(B+"firebase-firestore.js");
+      const app = initializeApp(cfg);
+      const auth = A.getAuth(app);
+      let db;
+      try{ db = F.initializeFirestore(app, { localCache: F.persistentLocalCache() }); }
+      catch(e){ db = F.getFirestore(app); }
+      window.__fbReady({
+        auth, db,
+        onAuthStateChanged: A.onAuthStateChanged, createUserWithEmailAndPassword: A.createUserWithEmailAndPassword,
+        signInWithEmailAndPassword: A.signInWithEmailAndPassword, sendEmailVerification: A.sendEmailVerification,
+        sendPasswordResetEmail: A.sendPasswordResetEmail, signOut: A.signOut, updateProfile: A.updateProfile,
+        GoogleAuthProvider: A.GoogleAuthProvider, signInWithPopup: A.signInWithPopup,
+        doc: F.doc, getDoc: F.getDoc, setDoc: F.setDoc, onSnapshot: F.onSnapshot
+      });
+    }catch(e){ console.error(e); window.__fbReady(null); }
+  } else { window.__fbReady(null); }
+</script>
+</body>
+</html>
